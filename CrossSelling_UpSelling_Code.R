@@ -6,6 +6,7 @@ setwd("~/Data Science/CrossSellingProject")
 
 #libraries
 library(readxl)
+library(dplyr)
 
 
 
@@ -24,4 +25,10 @@ unique(marketing_data$`Customer ID`)
 names(marketing_data) <- gsub(" ", "_", names(marketing_data))
 names(marketing_data) # sanity check
 str(marketing_data)
-
+boxplot(marketing_data$Ticket_Revenue)
+hist(marketing_data$Ticket_Revenue)
+max(marketing_data$Ticket_Revenue)
+# playing with data
+b<-filter(marketing_data, Ticket_Revenue<2000 )
+hist(marketing_data$Ticket_Revenue, breaks = 6000)
+mean(marketing_data$Ticket_Revenue)
