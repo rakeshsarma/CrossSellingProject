@@ -7,6 +7,7 @@ setwd("~/Data Science/CrossSellingProject")
 #libraries
 library(readxl)
 library(dplyr)
+install.packages("lubridate")
 
 
 
@@ -32,3 +33,12 @@ max(marketing_data$Ticket_Revenue)
 b<-filter(marketing_data, Ticket_Revenue<2000 )
 hist(marketing_data$Ticket_Revenue, breaks = 6000)
 mean(marketing_data$Ticket_Revenue)
+
+uniqueNos <- data.frame(apply(marketing_data, 2,function(x){length(unique(x))}))
+table(uniqueNos)
+View(uniqueNos)
+str(marketing_data)
+chisq.test(marketing_data$Address, marketing_data$Zip_Code)
+marketing_data$addrNo<-as.integer(substr(marketing_data$Address, 1, nchar(marketing_data$Address)-8))
+cor(marketing_data$addrNo, marketing_data$Zip_Code)
+sum(marketing_data$Dispatch_Date- marketing_data$Schedule_Date)
