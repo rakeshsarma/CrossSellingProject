@@ -9,6 +9,7 @@ library(readxl)
 library(XLConnect)
 library(caret)
 library(dplyr)
+library(reshape2)
 marketing_data<- read_excel("~/Data Science/CrossSellingProject/Target Marketing and cross selling - Data.xls")
 summary(marketing_data)
 str(marketing_data)
@@ -68,6 +69,38 @@ View(mean_call_diff)
 marketing_data_churn_4<-merge(marketing_data_churn_3, mean_call_diff, by = "Customer_ID", all.x = T)
 
 View(marketing_data_churn_4)
+# calculate the average time taken to resolve a complaint
+marketing_data_churn_4$time_taken_to_resolve <- as.Date(marketing_data_churn_4$Complete_Date)-as.Date(marketing_data_churn_4$Call_Date)
+View(marketing_data_churn_4)
 # calculate the mean call diff for each customer type and use them as cutoff
 lookup_mean_call_day_basedOnCustType<-marketing_data_churn_4 %>% group_by(Customer_Type) %>% summarise(mean_call_day_cust_type =mean(CallDay))
-# merging the dataframe to 
+# merging the dataframe (lookup_mean_call_day_basedOnCustType) to with marketing_data_churn_4
+marketing_data_churn_5<-merge(marketing_data_churn_4, lookup_mean_call_day_basedOnCustType, by = "Customer_Type", all.x = T)
+View(marketing_data_churn_5)
+# if the mean_call_day_cust_type > mean_call_diff for each customer then the customer will churn, else no
+marketing_data_churn_5$churned<- ifelse(marketing_data_churn_5$mean_call_day_cust_type<marketing_data_churn_5$mean_call_diff, 1, 0)
+length(unique(marketing_data_churn_5$Job_Code))
+
+# F3 : Inocrporating how many times a customer called for each rev code and job code
+attach(marketing_data_churn_5)
+rev_job_cust <- select(marketing_data_churn_5, Customer_ID, Rev_Code,Job_Code)
+detach(marketing_data_churn_5)
+jobCode_cast <- dcast(rev_job_cust,rev_job_cust$Customer_ID~rev_job_cust$Job_Code )
+colnames(jobCode_cast)<-paste("Job_Code", colnames(jobCode_cast), sep = "_")
+rev_code_cast <- dcast(rev_job_cust,rev_job_cust$Customer_ID~rev_job_cust$Rev_Code )
+colnames(rev_code_cast)<-paste("Rev_Code",colnames(rev_code_cast), sep = "_")
+colnames(rev_code_cast)[1]<-"Customer_ID"
+colnames(jobCode_cast)[1]<-"Customer_ID"
+View(jobCode_cast)
+View(rev_code_cast)
+# merging both rev_code and job_code 
+job_rev <- merge(jobCode_cast, rev_code_cast, by = "Customer_ID", all.x = T)
+View(job_rev)
+rm(jobCode_cast)
+rm(rev_code_cast)
+# merging jeb_rev with marketing_data_churn_5
+marketing_data_churn_6 <- merge(marketing_data_churn_5, job_rev, by = "Customer_ID", all.x = T)
+View(marketing_data_churn_6)
+#F4 : Avg_time for addressing the concern(TAC) : Some records have "2000-01-01", these records are assumed to be resolved 
+#on the dispatch day
+
