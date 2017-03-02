@@ -129,6 +129,120 @@ View(marketing_data_churn_10)
 #F5 Average time taken to resolve a complaint
 avg_time_to_resolve <- marketing_data_churn_10 %>%group_by(Customer_ID) %>% summarise(mean_time_to_resolve= mean(time_taken_to_resolve)) 
 View(avg_time_to_resolve)
+marketing_data_churn_11 <- merge(marketing_data_churn_10, avg_time_to_resolve, by = "Customer_ID", all.x = T)
+View(marketing_data_churn_11)
 #Lets start building model
+#Cleaning data for building model
+#removing useless columns
+write.csv(marketing_data_churn_11, "marketing_data_churn.csv")
+colnames(marketing_data_churn_11)
+useless_cols<- c("Customer_ID", "Dispatch_Date_1","Branch_ID", "City", "State", "Zip_Code", "Zip_5", "Setup_Date","Last_Service_Date", "Area_2", "Call_Date", "Complete_Date","Year_Month", "Year", "Week_Ending_Date"  )
+marketing_data_churn_12 <- select(marketing_data_churn_11, -contains("ate"))
+View(marketing_data_churn_12)
+
+#importing data from Excel
+
+marketing_data_churn_13<- read_excel("/Users/raki/Data Science/CrossSellingProject/marketing_data_churn_2.xls", sheet = 1, col_names = T)
+str(marketing_data_churn_13)
+marketing_data_churn_13$churned<- as.factor(as.character(marketing_data_churn_13$churned))
+marketing_data_churn_13$Cust_Type<- as.factor(as.character(marketing_data_churn_13$Cust_Type))
+marketing_data_churn_13$Area_1<- as.factor(as.character(marketing_data_churn_13$Area_1))
+str(marketing_data_churn_13)
+View(marketing_data_churn_13)
+# Building a model
+#split_train and Test
+train_rows<- createDataPartition(marketing_data_churn_13$churned, p=0.7, times = 1, list = F)
+train_data <- marketing_data_churn_13[train_rows,] 
+test_data <- marketing_data_churn_13[-train_rows,] 
+#building a naive bayes model
+library(e1071)
+NBModel<-naiveBayes(churned~., data = train_data)
+# Accuracy on train data
+#predict on train
+NB_train<-predict(NBModel, newdata = train_data)
+conf.mat = table(train_data$churned,NB_train)
+accuracy_NB_train = sum(diag(conf.mat))/sum(conf.mat)
+precision_NB_train = conf.mat[2,2]/sum(conf.mat[,2])
+recall_NB_Train = conf.mat[2,2]/sum(conf.mat[2,])
+predict(NBModel, newdata = test_data)
+
+# Predict on test
+NB_test<-predict(NBModel, newdata = test_data[,-1])
+conf.mat_test = table(test_data$churned,NB_test)
+accuracy_NB_test = sum(diag(conf.mat_test))/sum(conf.mat_test)
+precision_NB_test = conf.mat_test[2,2]/sum(conf.mat_test[,2])
+recall_NB_Test = conf.mat_test[2,2]/sum(conf.mat_test[2,])
+
+########Using random forest model#################
+library(randomForest)
+model = randomForest(churned ~ ., data=train_data,keep.forest=TRUE, ntree=50)
+# As model is not able to handle lets take out Area_1 and see
+train_data <- train_data[, c(-3)]
+test_data <- test_data[, c(-3)]
+# Building the model again
+model = randomForest(churned ~ ., data=train_data,keep.forest=TRUE, ntree=50)
+varImpPlot(model)
+# Lets take top 5 variables
+train_data_2<- select(train_data, churned,mean_call_diff, DispatchDay_1, Cust_Type, Cust_age, Total_Call_revenue, mean_time_to_resolve)
+model = randomForest(churned ~ ., data=train_data_2,keep.forest=TRUE, ntree=50)
+##############Function for NB MOdel#######
+
+NBModel<-naiveBayes(churned~., data = train_data_2)
+  # Accuracy on train data
+  #predict on train
+  NB_train_2<-predict(NBModel, newdata = train_data_2)
+  conf.mat_2 = table(train_data_2$churned,NB_train_2)
+  accuracy_NB_train_2 = sum(diag(conf.mat_2))/sum(conf.mat_2)
+  precision_NB_train_2 = conf.mat_2[2,2]/sum(conf.mat_2[,2])
+  recall_NB_Train_2 = conf.mat_2[2,2]/sum(conf.mat_2[2,])
+  print("accuracy is ",accuracy_NB_train_2)
+  print("precision is ", precision_NB_train_2)
+  print("recall is ", recall_NB_Train_2)
 
 
+
+
+# Predict on test
+  test_data_2<- select(test_data, churned,mean_call_diff, DispatchDay_1, Cust_Type, Cust_age, Total_Call_revenue, mean_time_to_resolve)
+NB_test_2<-predict(NBModel, newdata = test_data[,-1])
+conf.mat_test_2 = table(test_data_2$churned,NB_test_2)
+accuracy_NB_test_2 = sum(diag(conf.mat_test_2))/sum(conf.mat_test_2)
+precision_NB_test_2 = conf.mat_test_2[2,2]/sum(conf.mat_test_2[,2])
+recall_NB_Test_2 = conf.mat_test_2[2,2]/sum(conf.mat_test_2[2,])
+
+# using random forest on First and second data
+rf_model_1 <- randomForest(churned ~ ., data=train_data,keep.forest=TRUE, ntree=500)
+RF_model_train_1<-predict(rf_model_1, newdata = train_data)
+rf_model_2 <- randomForest(churned ~ ., data=train_data_2,keep.forest=TRUE, ntree=500)
+RF_model_train_2<-predict(rf_model_2, newdata = train_data_2)
+########using random forest on train confusion matrix
+# COnf matrix for RF Model 1
+conf.mat_train_RF_1 = table(train_data$churned,RF_model_train_1)
+accuracy_RF_train_1 = sum(diag(conf.mat_train_RF_1))/sum(conf.mat_train_RF_1)
+precision_RF_train_1 = conf.mat_train_RF_1[2,2]/sum(conf.mat_train_RF_1[,2])
+recall_RF_Train_1 = conf.mat_train_RF_1[2,2]/sum(conf.mat_train_RF_1[2,])
+
+########using random forest on test confusion matrix
+# COnf matrix for RF Model 1
+RF_model_test_1 <- predict(rf_model_1, newdata = test_data)
+conf.mat_test_RF_1 = table(test_data$churned,RF_model_test_1)
+accuracy_RF_test_1 = sum(diag(conf.mat_test_RF_1))/sum(conf.mat_test_RF_1)
+precision_RF_test_1 = conf.mat_test_RF_1[2,2]/sum(conf.mat_test_RF_1[,2])
+recall_RF_Test_1 = conf.mat_test_RF_1[2,2]/sum(conf.mat_test_RF_1[2,])
+
+########using random forest on train confusion matrix on model 2
+# COnf matrix for RF Model 2
+
+conf.mat_train_RF_2 = table(train_data_2$churned,RF_model_train_2)
+accuracy_RF_train_2 = sum(diag(conf.mat_train_RF_2))/sum(conf.mat_train_RF_2)
+precision_RF_train_2 = conf.mat_train_RF_2[2,2]/sum(conf.mat_train_RF_2[,2])
+recall_RF_Train_2 = conf.mat_train_RF_2[2,2]/sum(conf.mat_train_RF_2[2,])
+
+########using random forest on test confusion matrix on model 2
+# COnf matrix for RF Model 2
+RF_model_test_2 <- predict(rf_model_2, newdata = test_data_2)
+
+conf.mat_test_RF_2 = table(test_data_2$churned,RF_model_test_2)
+accuracy_RF_test_2 = sum(diag(conf.mat_test_RF_2))/sum(conf.mat_test_RF_2)
+precision_RF_test_2 = conf.mat_test_RF_2[2,2]/sum(conf.mat_test_RF_2[,2])
+recall_RF_Test_2 = conf.mat_test_RF_2[2,2]/sum(conf.mat_test_RF_2[2,])
