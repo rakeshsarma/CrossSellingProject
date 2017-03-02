@@ -49,7 +49,7 @@ check_last_service_day %>% group_by(Customer_ID) %>% summarise(count=n()) %>% ar
 #lets investigate this guy C000282
 View(marketing_data_1)
 # The customer moved from NY to CA. 
-#Assuming the customer's behavious changes when the customer moves from east coast to west coast
+#Assuming the customer's behaviour changes when the customer moves from east coast to west coast
 #The row is of no use for evaluaiton, so, lets delete the CHEEKTOWAGA (NY) Customer
 marketing_data_churn_2 <- as.data.frame(setdiff(marketing_data_1, as.data.frame(subset(marketing_data_1, Customer_ID=="C000282" & Branch_ID =="B0004"))))
 View(marketing_data_churn_2)
@@ -103,4 +103,32 @@ marketing_data_churn_6 <- merge(marketing_data_churn_5, job_rev, by = "Customer_
 View(marketing_data_churn_6)
 #F4 : Avg_time for addressing the concern(TAC) : Some records have "2000-01-01", these records are assumed to be resolved 
 #on the dispatch day
+
+Dispatch_Date_1<-as.Date(ifelse(as.Date(marketing_data_churn_6$Dispatch_Date)==as.Date("2000-01-01"), as.Date(marketing_data_churn_6$Schedule_Date),as.Date(marketing_data_churn_6$Dispatch_Date)), origin = "1970-01-01")
+marketing_data_churn_7 <- data.frame(Dispatch_Date_1, marketing_data_churn_6)
+View(marketing_data_churn_7)
+marketing_data_churn_7$DispatchDay_1<- as.Date(marketing_data_churn_7$Dispatch_Date_1)- marketing_data_churn_7$epochdate
+#F5 : No of times SLA was breached for each customer
+SLAbreach_df<-marketing_data_churn_7 %>% group_by(Customer_Type) %>% summarise(variance=var(time_taken_to_resolve), mean= mean(time_taken_to_resolve))
+SLAbreach_df$slaBreach<-SLAbreach_df$mean+1.644*(SLAbreach_df$variance)
+View(SLAbreach_df)
+SLAbreach_df$variance <-NULL
+SLAbreach_df$mean <- NULL
+# Merging this with data frame
+marketing_data_churn_8 <- merge(marketing_data_churn_7, SLAbreach_df, by = "Customer_Type", all.x = T)
+View(marketing_data_churn_8)
+marketing_data_churn_8$slaBreachFlag<- ifelse(marketing_data_churn_8$time_taken_to_resolve>marketing_data_churn_8$slaBreach, 1,0)
+#slabreach for each customer
+Count_SLAbreach<-marketing_data_churn_8 %>% group_by(Customer_ID) %>% summarise(SLABreach_number= sum(slaBreachFlag))
+View(Count_SLAbreach)
+marketing_data_churn_9 <- merge(marketing_data_churn_8, Count_SLAbreach, by = "Customer_ID", all.x = T)
+View(marketing_data_churn_9)
+slaBreach_df<-marketing_data_churn_9 %>% group_by(Customer_ID) %>% summarise(SLABreachCount= sum(slaBreachFlag))
+marketing_data_churn_10 <- merge(marketing_data_churn_9, slaBreach_df, by = "Customer_ID", all.x = T)
+View(marketing_data_churn_10)
+#F5 Average time taken to resolve a complaint
+avg_time_to_resolve <- marketing_data_churn_10 %>%group_by(Customer_ID) %>% summarise(mean_time_to_resolve= mean(time_taken_to_resolve)) 
+View(avg_time_to_resolve)
+#Lets start building model
+
 
