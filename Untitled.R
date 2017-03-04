@@ -1,0 +1,28 @@
+View(marketing_data_churn_5)
+attach(marketing_data_churn_5)
+rev_job_cust <- select(marketing_data_churn_5, Customer_ID, Rev_Code,Job_Code)
+detach(marketing_data_churn_5)
+library(reshape2)
+melt(rev_job_cust, value.name = "value")
+a<-dcast(rev_job_cust,rev_job_cust$Customer_ID~rev_job_cust$Rev_Code )
+View(a)
+job<-dcast(rev_job_cust,rev_job_cust$Customer_ID~rev_job_cust$Job_Code )
+View(b)
+colnames(b)<-paste("Job_Code", colnames(b), sep = "_")
+View(b)
+View(rev_job_cust)
+jobcode_df <- rep("Job_Code", 51)
+(colnames(b))
+
+View(b)
+dim(b)
+
+sum(as.character(marketing_data_churn_4$Dispatch_Date)==as.character("2000-01-01"))
+library(lubridate)
+lubridate::origin
+detach("package:lubridate", unload=TRUE)
+new_marketing_data<-marketing_data_churn_7[,c("Rev_Code", "Job_Code", "time_taken_to_resolve", "Customer_Type","churned")]
+library(rpart)
+modela<-rpart(churned~., data = new_marketing_data, control=rpart.control(minsplit=1, minbucket=3, cp=0.001))
+plot(modela)
+text(modela)

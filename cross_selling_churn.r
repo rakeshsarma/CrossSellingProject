@@ -10,6 +10,9 @@ library(XLConnect)
 library(caret)
 library(dplyr)
 library(reshape2)
+library(car)
+library(vegan)
+library(dummies)
 marketing_data<- read_excel("~/Data Science/CrossSellingProject/Target Marketing and cross selling - Data.xls")
 summary(marketing_data)
 str(marketing_data)
@@ -141,22 +144,34 @@ marketing_data_churn_12 <- select(marketing_data_churn_11, -contains("ate"))
 View(marketing_data_churn_12)
 
 #importing data from Excel
-
-marketing_data_churn_13<- read_excel("/Users/raki/Data Science/CrossSellingProject/marketing_data_churn_2.xls", sheet = 1, col_names = T)
+set.seed(123)
+#marketing_data_churn_13<- read_excel("/Users/raki/Data Science/CrossSellingProject/marketing_data_churn_2.xls", sheet = 1, col_names = T)
+marketing_data_churn_13<- read_excel("/Users/raki/Data Science/CrossSellingProject/marketing_data_churn_2.xls", sheet = 7, col_names = T)
 str(marketing_data_churn_13)
 marketing_data_churn_13$churned<- as.factor(as.character(marketing_data_churn_13$churned))
 marketing_data_churn_13$Cust_Type<- as.factor(as.character(marketing_data_churn_13$Cust_Type))
-marketing_data_churn_13$Area_1<- as.factor(as.character(marketing_data_churn_13$Area_1))
+#marketing_data_churn_13$Area<- as.factor(as.character(marketing_data_churn_13$Area_1))
 str(marketing_data_churn_13)
 View(marketing_data_churn_13)
+cat_attr<- c("churned", "Cust_Type")
+cat_data<-marketing_data_churn_13[cat_attr]
+num_attr<- setdiff(names(marketing_data_churn_13), cat_attr)
+num_data<- marketing_data_churn_13[num_attr]
+
+num_data_standardized<-apply(num_data, 2,function(x){decostand(x,method = "range")} )
+View(num_data_standardized)
+marketing_data_churn_14<- data.frame(cat_data, num_data_standardized)
+View(marketing_data_churn_14)
 # Building a model
 #split_train and Test
-train_rows<- createDataPartition(marketing_data_churn_13$churned, p=0.7, times = 1, list = F)
-train_data <- marketing_data_churn_13[train_rows,] 
-test_data <- marketing_data_churn_13[-train_rows,] 
+train_rows<- createDataPartition(marketing_data_churn_14$churned, p=0.7, times = 1, list = F)
+train_data <- marketing_data_churn_14[train_rows,] 
+test_data <- marketing_data_churn_14[-train_rows,] 
+View(train_data)
 #building a naive bayes model
 library(e1071)
 NBModel<-naiveBayes(churned~., data = train_data)
+
 # Accuracy on train data
 #predict on train
 NB_train<-predict(NBModel, newdata = train_data)
@@ -175,15 +190,17 @@ recall_NB_Test = conf.mat_test[2,2]/sum(conf.mat_test[2,])
 
 ########Using random forest model#################
 library(randomForest)
+View(train_data)
 model = randomForest(churned ~ ., data=train_data,keep.forest=TRUE, ntree=50)
+
 # As model is not able to handle lets take out Area_1 and see
-train_data <- train_data[, c(-3)]
-test_data <- test_data[, c(-3)]
 # Building the model again
 model = randomForest(churned ~ ., data=train_data,keep.forest=TRUE, ntree=50)
 varImpPlot(model)
 # Lets take top 5 variables
-train_data_2<- select(train_data, churned,mean_call_diff, DispatchDay_1, Cust_Type, Cust_age, Total_Call_revenue, mean_time_to_resolve)
+
+#train_data_2<- select(train_data, churned, DispatchDay_1, Cust_Type, Cust_age, Total_Call_revenue, mean_time_to_resolve)
+train_data_2<- select(train_data, churned, Cust_age, Total_Revenue, mean_time_to_resolve, Rev_Code_1, Job_Code_1,Job_Code_0,Job_Code_2,Job_Code_5, Rev_Code_3)
 model = randomForest(churned ~ ., data=train_data_2,keep.forest=TRUE, ntree=50)
 ##############Function for NB MOdel#######
 
@@ -195,25 +212,26 @@ NBModel<-naiveBayes(churned~., data = train_data_2)
   accuracy_NB_train_2 = sum(diag(conf.mat_2))/sum(conf.mat_2)
   precision_NB_train_2 = conf.mat_2[2,2]/sum(conf.mat_2[,2])
   recall_NB_Train_2 = conf.mat_2[2,2]/sum(conf.mat_2[2,])
-  print("accuracy is ",accuracy_NB_train_2)
-  print("precision is ", precision_NB_train_2)
-  print("recall is ", recall_NB_Train_2)
+  cat("accuracy is ", accuracy_NB_train_2)
+  cat("precision is ", precision_NB_train_2)
+  cat("recall is ", recall_NB_Train_2)
 
 
 
 
 # Predict on test
-  test_data_2<- select(test_data, churned,mean_call_diff, DispatchDay_1, Cust_Type, Cust_age, Total_Call_revenue, mean_time_to_resolve)
-NB_test_2<-predict(NBModel, newdata = test_data[,-1])
+#test_data_2<- select(test_data, churned, DispatchDay_1, Cust_Type, Cust_age, Total_Call_revenue, mean_time_to_resolve)
+test_data_2<- select(test_data, churned, Cust_age, Total_Revenue, mean_time_to_resolve, Rev_Code_1, Job_Code_1,Job_Code_0,Job_Code_2,Job_Code_5, Rev_Code_3)
+  NB_test_2<-predict(NBModel, newdata = test_data[,-1])
 conf.mat_test_2 = table(test_data_2$churned,NB_test_2)
 accuracy_NB_test_2 = sum(diag(conf.mat_test_2))/sum(conf.mat_test_2)
 precision_NB_test_2 = conf.mat_test_2[2,2]/sum(conf.mat_test_2[,2])
 recall_NB_Test_2 = conf.mat_test_2[2,2]/sum(conf.mat_test_2[2,])
 
 # using random forest on First and second data
-rf_model_1 <- randomForest(churned ~ ., data=train_data,keep.forest=TRUE, ntree=500)
+rf_model_1 <- randomForest(churned ~ ., data=train_data,keep.forest=TRUE, ntree=50)
 RF_model_train_1<-predict(rf_model_1, newdata = train_data)
-rf_model_2 <- randomForest(churned ~ ., data=train_data_2,keep.forest=TRUE, ntree=500)
+rf_model_2 <- randomForest(churned ~ ., data=train_data_2,keep.forest=TRUE, ntree=50)
 RF_model_train_2<-predict(rf_model_2, newdata = train_data_2)
 ########using random forest on train confusion matrix
 # COnf matrix for RF Model 1
@@ -246,3 +264,60 @@ conf.mat_test_RF_2 = table(test_data_2$churned,RF_model_test_2)
 accuracy_RF_test_2 = sum(diag(conf.mat_test_RF_2))/sum(conf.mat_test_RF_2)
 precision_RF_test_2 = conf.mat_test_RF_2[2,2]/sum(conf.mat_test_RF_2[,2])
 recall_RF_Test_2 = conf.mat_test_RF_2[2,2]/sum(conf.mat_test_RF_2[2,])
+
+#####################Lwts try Logistic Regression model
+
+logistic_model <- glm(churned ~ ., data=train_data, family = "binomial")
+summary(logistic_model)
+logistic_model <- glm(churned ~ ., data=train_data_2, family = "binomial")
+summary(logistic_model)
+logistic_model <- glm(churned ~ Cust_age, data=train_data_2, family = "binomial")
+prob<-predict(logistic_model, type="response")
+#######
+library(ROCR)
+p <- predict(logistic_model,train_data[,-1], type="response")
+pr <- prediction(p, train_data$churned)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+abline(a=0, b= 1)
+
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+
+##################SVM on train data##############
+View(train_data)
+cust_type_dummies<-dummy(train_data$Cust_Type)
+train_data_svm <- data.frame(cust_type_dummies, train_data)
+train_data_svm <- train_data_svm[,-5]
+train_data_svm <- select(train_data_svm, churned, everything())
+View(train_data_svm)
+#svm_model <- svm(x = train_data_svm[,-1],y = train_data_svm[,1], kernel = "linear", type = "C-classification",
+#                 cost = 10, gamma = 0.1 )
+#changing to RBF kernel
+svm_model <- svm(x = train_data_svm[,-1],y = train_data_svm[,1], kernel = "radial", type = "C-classification",
+cost = 10, gamma = 0.1 )
+
+summary(svm_model)
+# prediction on train 
+svm_model_train  =  predict(svm_model, train_data_svm[,-1]) 
+conf.mat_train_svm = table(train_data_svm$churned,svm_model_train)
+accuracy_svm_train = sum(diag(conf.mat_train_svm))/sum(conf.mat_train_svm)
+precision_svm_train = conf.mat_train_svm[2,2]/sum(conf.mat_train_svm[,2])
+recall_svm_Train = conf.mat_train_svm[2,2]/sum(conf.mat_train_svm[2,])
+
+
+
+##################SVM on test data##############
+cust_type_dummies_test<-dummy(test_data$Cust_Type)
+test_data_svm <- data.frame(cust_type_dummies_test, test_data)
+test_data_svm <- test_data_svm[,-5]
+test_data_svm <- select(test_data_svm, churned, everything())
+View(test_data_svm)
+
+
+# prediction on test 
+svm_model_test  =  predict(svm_model, test_data_svm[,-1]) 
+conf.mat_test_svm = table(test_data_svm$churned,svm_model_test)
+accuracy_svm_test = sum(diag(conf.mat_test_svm))/sum(conf.mat_test_svm)
+precision_svm_test = conf.mat_test_svm[2,2]/sum(conf.mat_test_svm[,2])
+recall_svm_Test = conf.mat_test_svm[2,2]/sum(conf.mat_test_svm[2,])
